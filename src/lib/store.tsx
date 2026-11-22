@@ -15,6 +15,7 @@ export type Plan = 'free' | 'paid';
 type State = {
   documents: StoredDocument[];
   tasks: Task[];
+  /** 課金の状態をここに写したもの（課金のしくみが正。billing.tsx 参照） */
   plan: Plan;
   /** 期限の何日前に知らせるか（有料で選べる。無料は FREE_REMINDER_DAYS） */
   reminderDays: number[];

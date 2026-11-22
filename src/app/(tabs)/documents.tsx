@@ -88,6 +88,14 @@ export default function DocumentsScreen() {
         )}
       </Section>
 
+      <Section title="プラン">
+        <Card onPress={() => router.push('/plan')}>
+          <ThemedText type="smallBold">{plan === 'paid' ? '有料プランをご利用中' : '有料プラン（月額480円・年額4,800円）'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            書類の数が無制限、本文の検索、前の版との違い、通知の日を選べます
+          </ThemedText>
+        </Card>
+      </Section>
     </Screen>
   );
 }
