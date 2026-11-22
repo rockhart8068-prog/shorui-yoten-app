@@ -27,6 +27,7 @@ export const DISPUTE_KEYWORDS = [
   '和解',
   '損害賠償請求',
   '受任通知',
+  '債権譲渡',
   '請求書兼通知書',
   '通知書兼請求書',
 ];
@@ -52,11 +53,16 @@ const DEMAND_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /代理人として[^。]*貴(殿|社|方)|貴(殿|社|方)[^。]*代理人として/, label: '代理人からの通知' },
   // 再三の請求・督促
   { pattern: /再三[^。]*(請求|督促|催促|ご連絡|お願い|お知らせ)/, label: '再三の請求' },
+  // 債権譲渡の通知
+  { pattern: /貴(殿|社|方)に対する(債権|貸金|売掛金)/, label: '債権譲渡' },
 ];
 
-/** 題名の行にあれば督促とみなす言い回し（「最終更新日」などは含めない） */
+/**
+ * 題名の行にあり、本文が支払い遅れを指しているときに督促とみなす言い回し。
+ * 「無料期間終了の最終のお知らせ」「契約更新の最終のご案内」のような普通の案内は、題名だけでは止めない。
+ */
 const HEADING_PATTERNS: { pattern: RegExp; label: string }[] = [
-  { pattern: /最終(の)?(ご案内|お知らせ|通知|ご通知|ご請求|請求|通告|催告|警告|ご連絡)/, label: '最終のご案内' },
+  { pattern: /最終(の)?(ご案内|お知らせ|通知|ご通知|ご請求|請求|通告|警告|ご連絡)/, label: '最終のご案内' },
 ];
 
 /**
@@ -122,7 +128,7 @@ export function detectDispute(text: string): string | null {
   const inHeading = DISPUTE_KEYWORDS.find((w) => heading.includes(w));
   if (inHeading) return inHeading;
   const headingPattern = HEADING_PATTERNS.find((h) => h.pattern.test(heading));
-  if (headingPattern) return headingPattern.label;
+  if (headingPattern && (ARREARS.test(text) || /請求して(おります|おりました|いますが|いましたが)/.test(text))) return headingPattern.label;
 
   const demand = DEMAND_PATTERNS.find((d) => d.pattern.test(text));
   if (demand) return demand.label;
