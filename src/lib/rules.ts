@@ -27,6 +27,9 @@ export const DISPUTE_KEYWORDS = [
   '和解',
   '損害賠償請求',
   '受任通知',
+  '明渡請求',
+  '明渡し請求',
+  '明け渡し請求',
   '滞納',
   '未納',
   '未払',
@@ -101,7 +104,7 @@ const HEDGED = /(ことが(あります|ある|ございます)|場合が(あり
 const GENERAL_CONDITION = /(不正(な)?(利用|使用|行為|アクセス)|違反|禁止(事項|行為)|規約に(反|違反)|転売|著作権|迷惑行為|虚偽)/;
 
 /** 受け取った人のいまの支払い遅れを指す語 */
-const ARREARS = /(未払|未納|滞納|延滞|お支払いが(確認|ない|な[くかけ]|ありません|され)|ご?入金が(確認|ない|な[くかけ]|ありません)|お支払いいただけ(ない|ず)|支払いがない|再三|至急(お支払|お振込|お振り込み|ご入金|ご返済|ご納付|納付))/;
+const ARREARS = /(未払|未納|滞納|延滞|不払|支払いを怠|(期日|期限)を(過ぎ|経過)|お支払いが(確認|ない|な[くかけ]|ありません|され)|ご?入金が(確認|ない|な[くかけ]|ありません)|お支払いいただけ(ない|ず)|支払いがない|再三|至急(お支払|お振込|お振り込み|ご入金|ご返済|ご納付|納付))/;
 
 /** 行政の通知。納税通知書の「納付がない場合は差押えを行うことがあります」のような決まり文句が多いので、題名でだけ判定する */
 const GOVERNMENT = /(市長|区長|町長|村長|知事|税務署|年金機構|役所|役場|国民年金|国民健康保険|市税|県税|都税|住民税|固定資産税)/;
@@ -114,6 +117,11 @@ function isContractLike(heading: string, text: string): boolean {
   const articles = text.split('\n').filter((l) => /^\s*第\s*[0-9０-９一二三四五六七八九十百]+\s*条/.test(l));
   return articles.length >= 2;
 }
+
+/** 支払い遅れの事実（「期日を過ぎてもご入金が確認できておりません」など） */
+const PAST_DUE = /((期日|期限|納期限)を(過ぎ|経過)|(ご?入金|お?支払い?|お振込み?|納付)が(確認でき(ません|ておりません|ていません|ない)|ございません|ありません))/;
+/** 支払いを求める文 */
+const PAY_REQUEST = /(お支払い|お振込み?|お振り込み|ご入金|ご納付|ご返済)(ください|下さい|をお願い|くださいます|いただきますよう)/;
 
 function splitSentences(text: string): string[] {
   return text
@@ -146,6 +154,9 @@ export function detectDispute(text: string): string | null {
 
   const demand = DEMAND_PATTERNS.find((d) => d.pattern.test(text));
   if (demand) return demand.label;
+
+  // 脅しの語がなくても、支払い遅れの事実と支払いを求める文がそろえば督促とみなす
+  if (PAST_DUE.test(text) && PAY_REQUEST.test(text)) return '支払いの督促';
 
   if (isContractLike(heading, text) || GOVERNMENT.test(text)) return null;
 
