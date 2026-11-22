@@ -1,18 +1,20 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { StoreProvider } from '@/lib/store';
 
-SplashScreen.preventAutoHideAsync();
-
-export default function TabLayout() {
+export default function RootLayout() {
   const colorScheme = useColorScheme();
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
+      <StoreProvider>
+        <Stack screenOptions={{ headerBackTitle: '戻る' }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="import" options={{ title: '書類を取り込む', presentation: 'modal' }} />
+          <Stack.Screen name="doc/[id]" options={{ title: '要点' }} />
+          <Stack.Screen name="diff/[id]" options={{ title: '前の版との違い' }} />
+        </Stack>
+      </StoreProvider>
     </ThemeProvider>
   );
 }

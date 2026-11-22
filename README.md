@@ -1,56 +1,48 @@
-# Welcome to your Expo app 👋
+# 書類の要点（仮）
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+賃貸・携帯/ネット回線・サブスクの契約書や行政の通知を取り込むと、書いてある要点を原文の箇所つきで示し、書面にある手続きと期限を「やること」として並べるスマホアプリです。企画書：「企画書：書類・規約の要点化とやること提案アプリ」（2026-11-22）。
 
-## Get started
+Expo（React Native + TypeScript、Expo SDK 58、expo-router）で、iPhoneとAndroidの両方に出します。
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 試し方
 
 ```bash
-npm run reset-project
+npm install
+npx expo start        # スマホの Expo Go でQRコードを読む
+npx expo start --web  # ブラウザで見る
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## 画面（企画書の画面構成どおり）
 
-### Other setup steps
+| 画面 | ファイル |
+| --- | --- |
+| 1. ホーム | `src/app/(tabs)/index.tsx` |
+| 2. 取り込み | `src/app/import.tsx` |
+| 3. 要点 | `src/app/doc/[id].tsx`（前の版との違いは `src/app/diff/[id].tsx`） |
+| 4. やること | `src/app/(tabs)/tasks.tsx` |
+| 5. 書類一覧 | `src/app/(tabs)/documents.tsx` |
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## 判断しないためのルールの置き場所
 
-## Learn more
+| ルール | 実装 |
+| --- | --- |
+| 1. 種類ごとに決めた項目だけを抜き出す | `src/lib/doc-types.ts`、`src/lib/extractor.ts` |
+| 2. 用語解説はAIに書かせず固定文 | `src/lib/glossary.ts` |
+| 3. 前の版との違いは字句だけ | `src/lib/diff.ts` |
+| 4. もめごとの書類は要点化せず相談先を案内 | `src/lib/rules.ts`（`detectDispute`、`CONSULT_CONTACTS`） |
+| 評価・勧めの言葉を出さない検査 | `src/lib/rules.ts`（`isDisplayable`）※AIをつなぐときに生成文へ適用する |
 
-To learn more about developing your project with Expo, look at the following resources:
+## いまの版でダミーのもの・まだのもの
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- 要点の抜き出しは、AIではなく原文から項目名を探すルールベースのダミーです（`ruleBasedExtractor`）。AIにつなぐときは `Extractor` と同じ形の結果を返す実装に差し替えます。
+- カメラ撮影とPDFの読み取りは、AIの読み取りをつなぐ版で入れます。今は文字の貼り付けと見本の書類で試せます。
+- 期限のプッシュ通知（expo-notifications）、課金（App Store・Google Playの定期購入）、保存時の暗号化はまだです。プランの切り替えは書類一覧の画面に開発用として置いています。
+- 無料プランの上限（10件）は企画書の仮の値です（`FREE_DOC_LIMIT`）。
 
-## Join the community
+## 確認
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+npm test           # 抜き出し・ルール・日付・違い表示のテスト
+npm run typecheck
+npm run lint
+```
