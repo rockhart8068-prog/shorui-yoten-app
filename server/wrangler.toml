@@ -1,0 +1,8 @@
+name = "shorui-yoten-server"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 秘密の値は wrangler secret put で入れる（ここには書かない）
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put APP_KEY

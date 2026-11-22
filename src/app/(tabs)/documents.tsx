@@ -24,7 +24,7 @@ function nextDate(doc: StoredDocument, tasks: Task[]): string | null {
 /** 画面5 書類一覧：検索、種類・相手先・更新日の絞り込み、同じ相手先の履歴 */
 export default function DocumentsScreen() {
   const theme = useTheme();
-  const { documents, tasks, plan, setPlan } = useStore();
+  const { documents, tasks, plan } = useStore();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<DocType | null>(null);
   const [sort, setSort] = useState<'new' | 'date'>('new');
@@ -88,14 +88,13 @@ export default function DocumentsScreen() {
         )}
       </Section>
 
-      <Section title="プラン（開発中の切り替え）">
-        <View style={styles.chips}>
-          <Chip label="無料" selected={plan === 'free'} onPress={() => setPlan('free')} />
-          <Chip label="有料（月額480円・年額4,800円）" selected={plan === 'paid'} onPress={() => setPlan('paid')} />
-        </View>
-        <ThemedText type="small" themeColor="textSecondary">
-          課金のしくみ（App Store・Google Playの定期購入）は次の版でつなぎます。
-        </ThemedText>
+      <Section title="プラン">
+        <Card onPress={() => router.push('/plan')}>
+          <ThemedText type="smallBold">{plan === 'paid' ? '有料プランをご利用中' : '有料プラン（月額480円・年額4,800円）'}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            書類の数が無制限、本文の検索、前の版との違い、通知の日を選べます
+          </ThemedText>
+        </Card>
       </Section>
     </Screen>
   );

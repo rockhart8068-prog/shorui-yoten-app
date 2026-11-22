@@ -8,9 +8,18 @@ Expo（React Native + TypeScript、Expo SDK 58、expo-router）で、iPhoneとAn
 
 ```bash
 npm install
-npx expo start        # スマホの Expo Go でQRコードを読む
-npx expo start --web  # ブラウザで見る
+cp .env.example .env  # 中継サーバーの宛先や課金のキーを入れる（空なら下の「ダミーで動く部分」のとおり）
+npx expo start --web  # ブラウザで見る（カメラ・通知・課金は動きません）
 ```
+
+カメラ、通知、課金はスマホの専用の試用版アプリ（development build）で試します。Expo Go では動きません。
+
+```bash
+npx eas-cli@latest build --profile development --platform ios   # または android
+npx expo start --dev-client
+```
+
+`app.json` の `bundleIdentifier` / `package`（いまは `com.example.shoruiyoten`）は、ストアに出す前に松さんのものに変えます。
 
 ## 画面（企画書の画面構成どおり）
 
@@ -30,19 +39,34 @@ npx expo start --web  # ブラウザで見る
 | 2. 用語解説はAIに書かせず固定文 | `src/lib/glossary.ts` |
 | 3. 前の版との違いは字句だけ | `src/lib/diff.ts` |
 | 4. もめごとの書類は要点化せず相談先を案内 | `src/lib/rules.ts`（`detectDispute`、`CONSULT_CONTACTS`） |
-| 評価・勧めの言葉を出さない検査 | `src/lib/rules.ts`（`isDisplayable`）※AIをつなぐときに生成文へ適用する |
+| 評価・勧めの言葉を出さない検査 | `src/lib/rules.ts`（`isDisplayable`）。AIの答えに `src/lib/ai.ts` の `buildFromQuotes` で適用 |
 
-## いまの版でダミーのもの・まだのもの
+AIの答えは、原文の中にそのままある文字列だけを使います（`buildFromQuotes`）。言い換え、決めた項目以外、評価や勧めの文は捨てて「見つかりませんでした」にします。もめごとの書類はAIに送る前に止めます。
 
-- 要点の抜き出しは、AIではなく原文から項目名を探すルールベースのダミーです（`ruleBasedExtractor`）。AIにつなぐときは `Extractor` と同じ形の結果を返す実装に差し替えます。
-- カメラ撮影とPDFの読み取りは、AIの読み取りをつなぐ版で入れます。今は文字の貼り付けと見本の書類で試せます。
-- 期限のプッシュ通知（expo-notifications）、課金（App Store・Google Playの定期購入）、保存時の暗号化はまだです。プランの切り替えは書類一覧の画面に開発用として置いています。
+## 仕組み
+
+| 部分 | 置き場所 |
+| --- | --- |
+| AIの中継サーバー（Cloudflare Workers、Claude API） | `server/`（設定は `server/README.md`） |
+| 中継サーバーの自動配置 | `.github/workflows/deploy-server.yml`（main に入ると配置） |
+| 撮影・写真・PDFの取り込み | `src/lib/capture.ts` |
+| AIの呼び出しと答えの確認 | `src/lib/ai.ts` |
+| 期限の通知（端末の中で予約） | `src/lib/reminders.ts`、`src/lib/notifications.ts` |
+| 課金（RevenueCat、月額・年額） | `src/lib/billing.tsx`、`src/app/plan.tsx` |
+
+## ダミーで動く部分・まだのもの
+
+- `.env` に中継サーバーの宛先が無いときは、AIではなくルールベースのダミー（`ruleBasedExtractor`）で要点を出します。撮影・PDFのボタンも押せません。
+- 課金のキーが無いとき（ブラウザ・未設定）は課金を使わず、開発中だけプランの画面に切り替えのボタンが出ます。
+- 期限の通知は、期日の3日前の朝9時（有料は 当日・1・3・7・14・30日前から選べる）。端末の中で予約するので、サーバーは使いません。
+- 保存時の暗号化はまだです。
 - 無料プランの上限（10件）は企画書の仮の値です（`FREE_DOC_LIMIT`）。
 
 ## 確認
 
 ```bash
-npm test           # 抜き出し・ルール・日付・違い表示のテスト
+npm test           # 抜き出し・ルール・日付・違い表示・AIの答えの確認・通知の予定のテスト
 npm run typecheck
 npm run lint
+cd server && npx tsc --noEmit   # 中継サーバーの型チェック
 ```

@@ -1,0 +1,35 @@
+# 中継サーバー（server/）を Cloudflare Workers に配置する。
+# GitHub の Settings → Secrets and variables → Actions に次の4つを入れてから、
+# Actions タブの「中継サーバーを配置」→「Run workflow」で動かす。
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, ANTHROPIC_API_KEY, APP_KEY
+name: 中継サーバーを配置
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['server/**', 'src/lib/rules.ts', 'src/lib/doc-types.ts', 'src/lib/types.ts']
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+        working-directory: server
+      - run: npx tsc --noEmit
+        working-directory: server
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: server
+          secrets: |
+            ANTHROPIC_API_KEY
+            APP_KEY
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APP_KEY: ${{ secrets.APP_KEY }}

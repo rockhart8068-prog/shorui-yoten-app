@@ -7,6 +7,8 @@ import { Button, Card, Chip, Notice, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { DOC_TYPE_LIST, FREE_DOC_LIMIT, guessDocType } from '@/lib/doc-types';
+import { aiAvailable, aiErrorMessage, aiExtractor, readDocument, type ReadFile } from '@/lib/ai';
+import { CaptureError, pickPdf, pickPhotos, takePhoto } from '@/lib/capture';
 import { ruleBasedExtractor } from '@/lib/extractor';
 import { CONSULT_CONTACTS } from '@/lib/rules';
 import { SAMPLE_DOCS } from '@/lib/samples';
@@ -24,6 +26,40 @@ export default function ImportScreen() {
   const [typeChosen, setTypeChosen] = useState(false);
   const [dispute, setDispute] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // 撮影・選んだページ（読み取り前）
+  const [pages, setPages] = useState<ReadFile[]>([]);
+  const [reading, setReading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const MAX_PAGES = 10;
+  const addPages = async (get: () => Promise<ReadFile[]>) => {
+    setError(null);
+    try {
+      const added = await get();
+      setPages((p) => [...p, ...added].slice(0, MAX_PAGES));
+    } catch (e) {
+      if (e instanceof CaptureError) {
+        setError(e.code === 'permission' ? 'カメラの使用が許可されていません。設定アプリから許可してください。' : 'PDFが大きすぎます（12MBまで）。');
+      } else {
+        setError('読み込めませんでした。');
+      }
+    }
+  };
+
+  const read = async () => {
+    if (pages.length === 0) return;
+    setReading(true);
+    setError(null);
+    try {
+      const t = await readDocument(pages);
+      setPages([]);
+      onTextChange(t);
+    } catch (e) {
+      setError(aiErrorMessage(e));
+    } finally {
+      setReading(false);
+    }
+  };
 
   const onTextChange = (t: string) => {
     setText(t);
@@ -43,7 +79,15 @@ export default function ImportScreen() {
     if (!type || !text.trim()) return;
     setBusy(true);
     try {
-      const result = await ruleBasedExtractor.extract(text, type);
+      setError(null);
+      const extractor = aiAvailable ? aiExtractor : ruleBasedExtractor;
+      let result;
+      try {
+        result = await extractor.extract(text, type);
+      } catch (e) {
+        setError(aiErrorMessage(e));
+        return;
+      }
       if (result.kind === 'dispute') {
         // もめごとの書類は保存も要点化もしない（ルール4）
         setDispute(result.matched);
@@ -90,13 +134,57 @@ export default function ImportScreen() {
       <Section title="1. 書類を読み取る">
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Button label="カメラで撮影" variant="secondary" disabled onPress={() => {}} />
+            <Button
+              label="カメラで撮影"
+              variant="secondary"
+              disabled={!aiAvailable || reading || pages.length >= MAX_PAGES}
+              onPress={() => addPages(async () => {
+                const p = await takePhoto();
+                return p ? [p] : [];
+              })}
+            />
           </View>
           <View style={{ flex: 1 }}>
-            <Button label="PDFを選ぶ" variant="secondary" disabled onPress={() => {}} />
+            <Button
+              label="写真から選ぶ"
+              variant="secondary"
+              disabled={!aiAvailable || reading || pages.length >= MAX_PAGES}
+              onPress={() => addPages(() => pickPhotos(MAX_PAGES - pages.length))}
+            />
           </View>
         </View>
-        <Notice>撮影とPDFの読み取りは、AIの読み取りをつなぐ次の版で使えます。今は文字を貼り付けるか、見本を選んでください。</Notice>
+        <Button
+          label="PDFを選ぶ"
+          variant="secondary"
+          disabled={!aiAvailable || reading || pages.length > 0}
+          onPress={() => addPages(async () => {
+            const p = await pickPdf();
+            return p ? [p] : [];
+          })}
+        />
+        {pages.length > 0 && (
+          <Card>
+            <ThemedText type="small">
+              {pages[0].mediaType === 'application/pdf' ? 'PDF 1件' : `${pages.length}ページ撮影済み`}
+              。続けて撮影すると次のページになります。
+            </ThemedText>
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <Button label={reading ? '読み取り中…' : '文字を読み取る'} onPress={read} disabled={reading} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button label="撮り直す" variant="secondary" onPress={() => setPages([])} disabled={reading} />
+              </View>
+            </View>
+          </Card>
+        )}
+        {!aiAvailable && (
+          <Notice>撮影とPDFの読み取りには、AIの中継サーバーの設定が必要です（開発中）。今は文字を貼り付けるか、見本を選んでください。</Notice>
+        )}
+        {error && <Notice>{error}</Notice>}
+        <ThemedText type="small" themeColor="textSecondary">
+          読み取った文字は下に入ります。読み違いがあれば直してから「要点を見る」を押してください。
+        </ThemedText>
         <View style={styles.chips}>
           {SAMPLE_DOCS.map((s) => (
             <Chip
