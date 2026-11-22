@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { canStoreAnother } from './doc-types';
+import { syncNotifications } from './notifications';
+import { FREE_REMINDER_DAYS } from './reminders';
 import type { DocType, ExtractedField, StoredDocument, Task, TaskDraft } from './types';
 
 /**
@@ -10,10 +12,19 @@ import type { DocType, ExtractedField, StoredDocument, Task, TaskDraft } from '.
  */
 export type Plan = 'free' | 'paid';
 
-type State = { documents: StoredDocument[]; tasks: Task[]; plan: Plan };
+type State = {
+  documents: StoredDocument[];
+  tasks: Task[];
+  plan: Plan;
+  /** 期限の何日前に知らせるか（有料で選べる。無料は FREE_REMINDER_DAYS） */
+  reminderDays: number[];
+};
 
 const STORAGE_KEY = 'shorui-app/state/v1';
-const EMPTY: State = { documents: [], tasks: [], plan: 'free' };
+const EMPTY: State = { documents: [], tasks: [], plan: 'free', reminderDays: FREE_REMINDER_DAYS };
+
+export const effectiveReminderDays = (s: Pick<State, 'plan' | 'reminderDays'>) =>
+  s.plan === 'paid' && s.reminderDays.length > 0 ? s.reminderDays : FREE_REMINDER_DAYS;
 
 const canAdd = (s: State) => canStoreAnother(s.plan, s.documents.length);
 
@@ -36,6 +47,7 @@ type Store = State & {
   deleteDocument(id: string): void;
   updateTask(id: string, patch: Partial<Pick<Task, 'dueDate' | 'registered' | 'done' | 'notify'>>): void;
   setPlan(plan: Plan): void;
+  setReminderDays(days: number[]): void;
 };
 
 const StoreContext = createContext<Store | null>(null);
@@ -56,6 +68,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (loaded) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
   }, [state, loaded]);
+
+  // やること・プラン・通知設定が変わったら、期限の通知を予約し直す
+  const reminderDays = effectiveReminderDays(state);
+  useEffect(() => {
+    if (loaded) syncNotifications(state.tasks, state.documents, reminderDays).catch(() => {});
+  }, [loaded, state.tasks, state.documents, reminderDays]);
 
   const addDocument = useCallback(
     (doc: NewDocument) => {
@@ -89,7 +107,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t)) }));
   }, []);
 
-  const setPlan = useCallback((plan: Plan) => setState((s) => ({ ...s, plan })), []);
+  const setPlan = useCallback((plan: Plan) => setState((s) => (s.plan === plan ? s : { ...s, plan })), []);
+  const setReminderDays = useCallback((days: number[]) => setState((s) => ({ ...s, reminderDays: [...days].sort((a, b) => a - b) })), []);
 
   const value = useMemo<Store>(
     () => ({
@@ -100,8 +119,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       deleteDocument,
       updateTask,
       setPlan,
+      setReminderDays,
     }),
-    [state, loaded, addDocument, deleteDocument, updateTask, setPlan],
+    [state, loaded, addDocument, deleteDocument, updateTask, setPlan, setReminderDays],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
