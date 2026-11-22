@@ -8,6 +8,7 @@ export function useColorScheme() {
   const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Expoのひな形のまま。Web表示でのhydration後に一度だけ切り替える
     setHasHydrated(true);
   }, []);
 
