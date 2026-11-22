@@ -26,6 +26,7 @@ export const DISPUTE_KEYWORDS = [
   '最終通告',
   '和解',
   '損害賠償請求',
+  '受任通知',
   '請求書兼通知書',
   '通知書兼請求書',
 ];
@@ -45,6 +46,17 @@ const DEMAND_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /内容証明郵便(にて|により|で)(通知|請求|催告)(いた)?(し|します|する)/, label: '内容証明' },
   { pattern: /(差押|差し押さえ)(え)?予告/, label: '差押' },
   { pattern: /支払督促(の)?(申立|申し立て)/, label: '督促' },
+  // 弁護士・代理人からの受任通知や請求
+  { pattern: /当職/, label: '代理人からの通知' },
+  { pattern: /受任(通知|いたしました|しました|しております)/, label: '代理人からの通知' },
+  { pattern: /代理人として[^。]*貴(殿|社|方)|貴(殿|社|方)[^。]*代理人として/, label: '代理人からの通知' },
+  // 再三の請求・督促
+  { pattern: /再三[^。]*(請求|督促|催促|ご連絡|お願い|お知らせ)/, label: '再三の請求' },
+];
+
+/** 題名の行にあれば督促とみなす言い回し（「最終更新日」などは含めない） */
+const HEADING_PATTERNS: { pattern: RegExp; label: string }[] = [
+  { pattern: /最終(の)?(ご案内|お知らせ|通知|ご通知|ご請求|請求|通告|催告|警告|ご連絡)/, label: '最終のご案内' },
 ];
 
 /**
@@ -55,10 +67,11 @@ const ESCALATION_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /法的(な)?(措置|手続き?|手段|処置)/, label: '法的措置' },
   { pattern: /(債権回収|サービサー|回収業者|回収代行)[^。]{0,12}(委託|委任|譲渡|依頼|移管|引き継)/, label: '債権回収' },
   { pattern: /支払督促|少額訴訟|民事調停/, label: '法的手続' },
-  { pattern: /弁護士(に|へ)(委任|依頼|委託)/, label: '弁護士への委任' },
+  { pattern: /弁護士[^。]{0,15}(委任|依頼|委託|引き継)/, label: '弁護士への委任' },
   { pattern: /損害賠償(金)?(を|の)?(請求|支払)/, label: '損害賠償請求' },
   { pattern: /(訴訟|訴え|裁判)(を|の)?(提起|起こ|申し立て|申立)|提訴/, label: '訴訟' },
-  { pattern: /(差押|差し押さえ)|強制執行/, label: '差押' },
+  { pattern: /(差押|差し押さえ)/, label: '差押' },
+  { pattern: /強制執行/, label: '強制執行' },
 ];
 
 /** 一般的な決まりとしての書き方（「〜ことがあります」「〜ものとします」）。この形の文は通告とみなさない */
@@ -108,6 +121,8 @@ export function detectDispute(text: string): string | null {
     .join('\n');
   const inHeading = DISPUTE_KEYWORDS.find((w) => heading.includes(w));
   if (inHeading) return inHeading;
+  const headingPattern = HEADING_PATTERNS.find((h) => h.pattern.test(heading));
+  if (headingPattern) return headingPattern.label;
 
   const demand = DEMAND_PATTERNS.find((d) => d.pattern.test(text));
   if (demand) return demand.label;
