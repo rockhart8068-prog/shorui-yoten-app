@@ -27,6 +27,9 @@ export const DISPUTE_KEYWORDS = [
   '和解',
   '損害賠償請求',
   '受任通知',
+  '滞納',
+  '未納',
+  '未払',
   '債権譲渡',
   '請求書兼通知書',
   '通知書兼請求書',
@@ -80,6 +83,17 @@ const ESCALATION_PATTERNS: { pattern: RegExp; label: string }[] = [
   { pattern: /強制執行/, label: '強制執行' },
 ];
 
+/**
+ * 支払い遅れを指す語と同じ文にあるときだけ、通告とみなす言い回し。
+ * 「契約解除」「利用停止」は普通の案内にも出るので、それだけでは止めない。
+ */
+const ARREARS_ESCALATION: { pattern: RegExp; label: string }[] = [
+  { pattern: /代位弁済/, label: '代位弁済' },
+  { pattern: /契約(を|の)?解除|ご契約を解除/, label: '契約解除' },
+  { pattern: /(利用|サービス|回線|供給|通話)(の|を)?(一時)?(停止|休止|止め)/, label: '利用停止' },
+  { pattern: /明け?渡し/, label: '明け渡し' },
+];
+
 /** 一般的な決まりとしての書き方（「〜ことがあります」「〜ものとします」）。この形の文は通告とみなさない */
 const HEDGED = /(ことが(あります|ある|ございます)|場合が(あります|ある)|ことができ|できるものと|ものとします|ものとする|可能性が(あります|ある)|とします。?$|とする。?$)/;
 
@@ -87,7 +101,7 @@ const HEDGED = /(ことが(あります|ある|ございます)|場合が(あり
 const GENERAL_CONDITION = /(不正(な)?(利用|使用|行為|アクセス)|違反|禁止(事項|行為)|規約に(反|違反)|転売|著作権|迷惑行為|虚偽)/;
 
 /** 受け取った人のいまの支払い遅れを指す語 */
-const ARREARS = /(未払|未納|滞納|延滞|お支払いが(確認|ない|な[くかけ]|ありません|され)|ご?入金が(確認|ない|な[くかけ]|ありません)|お支払いいただけ(ない|ず)|支払いがない|再三|至急)/;
+const ARREARS = /(未払|未納|滞納|延滞|お支払いが(確認|ない|な[くかけ]|ありません|され)|ご?入金が(確認|ない|な[くかけ]|ありません)|お支払いいただけ(ない|ず)|支払いがない|再三|至急(お支払|お振込|お振り込み|ご入金|ご返済|ご納付|納付))/;
 
 /** 行政の通知。納税通知書の「納付がない場合は差押えを行うことがあります」のような決まり文句が多いので、題名でだけ判定する */
 const GOVERNMENT = /(市長|区長|町長|村長|知事|税務署|年金機構|役所|役場|国民年金|国民健康保険|市税|県税|都税|住民税|固定資産税)/;
@@ -136,9 +150,11 @@ export function detectDispute(text: string): string | null {
   if (isContractLike(heading, text) || GOVERNMENT.test(text)) return null;
 
   for (const sentence of splitSentences(text)) {
+    const arrears = ARREARS.test(sentence);
+    const soft = ARREARS_ESCALATION.find((e) => e.pattern.test(sentence));
+    if (soft && arrears && !HEDGED.test(sentence)) return soft.label;
     const hit = ESCALATION_PATTERNS.find((e) => e.pattern.test(sentence));
     if (!hit) continue;
-    const arrears = ARREARS.test(sentence);
     if (GENERAL_CONDITION.test(sentence) && !arrears) continue;
     if (HEDGED.test(sentence) && !arrears) continue;
     return hit.label;
