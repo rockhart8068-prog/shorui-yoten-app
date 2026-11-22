@@ -6,14 +6,14 @@ import { ThemedText } from '@/components/themed-text';
 import { Card, Chip, Notice, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate, parseFirstDate } from '@/lib/dates';
+import { formatDate, localDate, parseFirstDate } from '@/lib/dates';
 import { DOC_TYPE_LIST, DOC_TYPES } from '@/lib/doc-types';
 import { historyOf, useStore } from '@/lib/store';
 import type { DocType, StoredDocument, Task } from '@/lib/types';
 
 /** 書類に書いてある日付のうち、今日以降で一番近いもの（更新日・期限での並べ替えに使う） */
 function nextDate(doc: StoredDocument, tasks: Task[]): string | null {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate();
   const dates = [
     ...tasks.filter((t) => t.docId === doc.id).map((t) => t.dueDate),
     ...doc.fields.map((f) => (f.value ? parseFirstDate(f.value) : null)),

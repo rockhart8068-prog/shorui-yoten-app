@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { TaskRow } from '@/components/task-row';
 import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Notice, Screen, Section } from '@/components/ui';
-import { daysUntil, formatDate } from '@/lib/dates';
+import { daysUntil, formatTimestamp } from '@/lib/dates';
 import { DOC_TYPES, FREE_DOC_LIMIT } from '@/lib/doc-types';
 import { useStore } from '@/lib/store';
 
@@ -45,7 +45,7 @@ export default function HomeScreen() {
               <ThemedText type="smallBold">{d.title}</ThemedText>
               <ThemedText type="small" themeColor="textSecondary">
                 {DOC_TYPES[d.type].label}
-                {d.counterparty ? ` ・ ${d.counterparty}` : ''} ・ {formatDate(d.createdAt.slice(0, 10))}取り込み
+                {d.counterparty ? ` ・ ${d.counterparty}` : ''} ・ {formatTimestamp(d.createdAt)}取り込み
               </ThemedText>
             </Card>
           ))

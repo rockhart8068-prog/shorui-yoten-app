@@ -3,8 +3,10 @@ import type { DocType } from './types.ts';
 /**
  * 種類ごとに「決めた項目」だけを抜き出す（判断しないルール1）。
  * keywords は原文でその項目を探す手がかりの語。
+ * labelOnly は「期間」「甲」のように条文の中にもよく出る短い語で、「項目：値」の項目名にあるときだけ使う
+ * （例：「第15条 貸主が相当の期間を定めて催告し…」を契約期間として出さない）。
  */
-export type FieldDef = { key: string; label: string; keywords: string[] };
+export type FieldDef = { key: string; label: string; keywords: string[]; labelOnly?: string[] };
 
 export type DocTypeDef = {
   type: DocType;
@@ -17,9 +19,9 @@ export const DOC_TYPES: Record<DocType, DocTypeDef> = {
     type: 'rental',
     label: '賃貸の契約',
     fields: [
-      { key: 'counterparty', label: '貸主・管理会社', keywords: ['貸主', '管理会社', '甲'] },
-      { key: 'property', label: '物件', keywords: ['物件', '所在地', '住所'] },
-      { key: 'period', label: '契約期間', keywords: ['契約期間', '賃貸借期間', '期間'] },
+      { key: 'counterparty', label: '貸主・管理会社', keywords: ['貸主', '管理会社', '甲'], labelOnly: ['甲', '管理会社'] },
+      { key: 'property', label: '物件', keywords: ['物件', '所在地', '住所'], labelOnly: ['物件', '住所'] },
+      { key: 'period', label: '契約期間', keywords: ['契約期間', '賃貸借期間', '期間'], labelOnly: ['期間'] },
       { key: 'rent', label: '賃料', keywords: ['賃料', '家賃'] },
       { key: 'commonFee', label: '共益費・管理費', keywords: ['共益費', '管理費'] },
       { key: 'deposit', label: '敷金', keywords: ['敷金', '保証金'] },
@@ -32,7 +34,7 @@ export const DOC_TYPES: Record<DocType, DocTypeDef> = {
     label: '携帯・ネット回線',
     fields: [
       { key: 'counterparty', label: '事業者', keywords: ['事業者', '提供者', '会社名'] },
-      { key: 'plan', label: '料金プラン', keywords: ['料金プラン', 'プラン'] },
+      { key: 'plan', label: '料金プラン', keywords: ['料金プラン', 'プラン'], labelOnly: ['プラン'] },
       { key: 'monthlyFee', label: '月額料金', keywords: ['月額', '基本料金', '月々'] },
       { key: 'period', label: '契約期間', keywords: ['契約期間', '最低利用期間'] },
       { key: 'cancelFee', label: '解約金', keywords: ['解約金', '違約金', '契約解除料'] },
@@ -58,10 +60,10 @@ export const DOC_TYPES: Record<DocType, DocTypeDef> = {
     fields: [
       { key: 'counterparty', label: '差出元', keywords: ['差出', '発行', '市長', '区長', '町長', '村長', '税務署', '年金事務所'] },
       { key: 'subject', label: '件名', keywords: ['件名', 'について', 'のお知らせ'] },
-      { key: 'deadline', label: '期限', keywords: ['提出期限', '納期限', '期限', 'までに'] },
+      { key: 'deadline', label: '期限', keywords: ['提出期限', '納期限', '期限', 'までに'], labelOnly: ['期限', 'までに'] },
       { key: 'amount', label: '金額', keywords: ['金額', '税額', '納付額', '保険料'] },
       { key: 'submitTo', label: '提出先・問い合わせ先', keywords: ['提出先', '問い合わせ', '問合せ', '窓口'] },
-      { key: 'documents', label: '必要なもの', keywords: ['必要書類', '持ち物', '添付', '必要なもの'] },
+      { key: 'documents', label: '必要なもの', keywords: ['必要書類', '持ち物', '添付', '必要なもの'], labelOnly: ['添付'] },
     ],
   },
 };
@@ -70,6 +72,11 @@ export const DOC_TYPE_LIST: DocTypeDef[] = Object.values(DOC_TYPES);
 
 /** 無料プランで保管できる書類の数（企画書の仮の値） */
 export const FREE_DOC_LIMIT = 10;
+
+/** 書類をもう1件保管できるか。無料プランは FREE_DOC_LIMIT 件まで、有料プランは無制限 */
+export function canStoreAnother(plan: 'free' | 'paid', storedCount: number): boolean {
+  return plan === 'paid' || storedCount < FREE_DOC_LIMIT;
+}
 
 const TYPE_HINTS: Record<DocType, string[]> = {
   rental: ['賃貸', '賃料', '家賃', '敷金', '貸主', '借主', '物件'],

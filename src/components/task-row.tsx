@@ -5,7 +5,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button, Card } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { daysUntil, formatDate } from '@/lib/dates';
+import { daysUntil, formatDate, isValidIsoDate } from '@/lib/dates';
 import { useStore } from '@/lib/store';
 import type { Task } from '@/lib/types';
 
@@ -18,15 +18,13 @@ export function dueLabel(task: Task): string {
   return `${date}（あと${d}日）`;
 }
 
-const ISO = /^\d{4}-\d{2}-\d{2}$/;
-
 /** 書面にある手続きの1件。mode=candidate は書類画面での登録前の表示 */
 export function TaskRow({ task, docTitle, onOpen, mode = 'registered' }: { task: Task; docTitle?: string; onOpen?: () => void; mode?: 'registered' | 'candidate' }) {
   const theme = useTheme();
   const { updateTask } = useStore();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(task.dueDate ?? '');
-  const valid = ISO.test(draft) && !Number.isNaN(Date.parse(draft));
+  const valid = isValidIsoDate(draft);
 
   return (
     <Card>

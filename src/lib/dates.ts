@@ -26,8 +26,9 @@ export function parseFirstDate(input: string): string | null {
     mo = Number(m[3]);
     d = Number(m[4]);
   }
-  if (y < 1900 || mo < 1 || mo > 12 || d < 1 || d > 31) return null;
-  return `${y}-${pad(mo)}-${pad(d)}`;
+  const iso = `${y}-${pad(mo)}-${pad(d)}`;
+  if (y < 1900 || !isValidIsoDate(iso)) return null;
+  return iso;
 }
 
 export function formatDate(iso: string): string {
@@ -41,4 +42,23 @@ export function daysUntil(iso: string, today = new Date()): number {
   const target = Date.UTC(y, m - 1, d);
   const base = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
   return Math.round((target - base) / 86400000);
+}
+
+/** 端末の時刻（日本なら日本時間）での日付を YYYY-MM-DD にする。toISOString は世界標準時なので、朝9時前は前の日になる */
+export function localDate(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** 保存した日時（ISO形式）を、端末の時刻での「YYYY年M月D日」にする */
+export function formatTimestamp(iso: string): string {
+  return formatDate(localDate(new Date(iso)));
+}
+
+/** YYYY-MM-DD の形で、暦の上にある日付か（2月31日などは false） */
+export function isValidIsoDate(s: string): boolean {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
 }

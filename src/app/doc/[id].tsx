@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Disclaimer, Notice, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatDate } from '@/lib/dates';
+import { formatTimestamp } from '@/lib/dates';
 import { DOC_TYPES } from '@/lib/doc-types';
 import { findGlossaryTerms } from '@/lib/glossary';
 import { historyOf, useStore } from '@/lib/store';
@@ -49,7 +49,7 @@ export default function DocumentScreen() {
       <Screen scrollRef={scrollRef}>
         <Disclaimer />
         <ThemedText type="small" themeColor="textSecondary">
-          {DOC_TYPES[doc.type].label} ・ {formatDate(doc.createdAt.slice(0, 10))}取り込み
+          {DOC_TYPES[doc.type].label} ・ {formatTimestamp(doc.createdAt)}取り込み
         </ThemedText>
 
         <Section title="書いてあること（タップで原文の箇所へ）">
@@ -91,7 +91,7 @@ export default function DocumentScreen() {
             {history.map((h) => (
               <Card key={h.id} onPress={h.id === doc.id ? undefined : () => router.push(`/doc/${h.id}`)}>
                 <ThemedText type="small">
-                  {formatDate(h.createdAt.slice(0, 10))} ・ {h.title}
+                  {formatTimestamp(h.createdAt)} ・ {h.title}
                   {h.id === doc.id ? '（この書類）' : ''}
                 </ThemedText>
               </Card>

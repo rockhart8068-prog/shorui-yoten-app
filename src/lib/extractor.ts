@@ -27,26 +27,34 @@ function splitLines(text: string): Line[] {
 /** 「項目：値」の形の行。項目名は短いものに限る */
 const LABEL_LINE = /^(\s*)([^：:。、]{1,15})[：:]\s*(.*\S)\s*$/;
 
+function found(def: FieldDef, line: Line, value: string, offset: number): ExtractedField {
+  const start = line.start + offset;
+  return { key: def.key, label: def.label, value, source: { start, end: start + value.length } };
+}
+
 function findField(lines: Line[], def: FieldDef, used: Set<number>): ExtractedField {
+  // 1. 「項目：値」の形で、項目名に手がかりの語がある行を優先する（値の部分だけを原文のまま出す）
   for (const keyword of def.keywords) {
     for (let i = 0; i < lines.length; i++) {
       if (used.has(i)) continue;
       const line = lines[i];
-      if (!line.text.includes(keyword) || !line.text.trim()) continue;
-      // 「項目：値」の形で項目名に手がかりの語があれば値の部分だけ、それ以外は行全体を原文のまま出す
       const m = line.text.match(LABEL_LINE);
-      let value: string;
-      let offset: number;
-      if (m && m[2].includes(keyword)) {
-        value = m[3];
-        offset = line.text.indexOf(value, m[1].length + m[2].length + 1);
-      } else {
-        value = line.text.trim();
-        offset = line.text.indexOf(value);
-      }
+      if (!m || !m[2].includes(keyword)) continue;
       used.add(i);
-      const start = line.start + offset;
-      return { key: def.key, label: def.label, value, source: { start, end: start + value.length } };
+      return found(def, line, m[3], line.text.indexOf(m[3], m[1].length + m[2].length + 1));
+    }
+  }
+  // 2. なければ、手がかりの語を含む文の行を丸ごと原文のまま出す。
+  //    条文によく出る短い語（labelOnly）では探さず、別の項目の「項目：値」の行も取らない
+  for (const keyword of def.keywords) {
+    if (def.labelOnly?.includes(keyword)) continue;
+    for (let i = 0; i < lines.length; i++) {
+      if (used.has(i)) continue;
+      const line = lines[i];
+      if (!line.text.includes(keyword) || !line.text.trim() || LABEL_LINE.test(line.text)) continue;
+      used.add(i);
+      const value = line.text.trim();
+      return found(def, line, value, line.text.indexOf(value));
     }
   }
   return { key: def.key, label: def.label, value: null, source: null };

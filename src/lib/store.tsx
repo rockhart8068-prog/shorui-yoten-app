@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { FREE_DOC_LIMIT } from './doc-types';
+import { canStoreAnother } from './doc-types';
 import type { DocType, ExtractedField, StoredDocument, Task, TaskDraft } from './types';
 
 /**
@@ -14,6 +14,8 @@ type State = { documents: StoredDocument[]; tasks: Task[]; plan: Plan };
 
 const STORAGE_KEY = 'shorui-app/state/v1';
 const EMPTY: State = { documents: [], tasks: [], plan: 'free' };
+
+const canAdd = (s: State) => canStoreAnother(s.plan, s.documents.length);
 
 const newId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -29,7 +31,8 @@ type NewDocument = {
 type Store = State & {
   loaded: boolean;
   canAddDocument: boolean;
-  addDocument(doc: NewDocument): string;
+  /** 無料プランの上限に達しているときは保存せず null を返す */
+  addDocument(doc: NewDocument): string | null;
   deleteDocument(id: string): void;
   updateTask(id: string, patch: Partial<Pick<Task, 'dueDate' | 'registered' | 'done' | 'notify'>>): void;
   setPlan(plan: Plan): void;
@@ -54,18 +57,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     if (loaded) AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => {});
   }, [state, loaded]);
 
-  const addDocument = useCallback((doc: NewDocument) => {
-    const id = newId();
-    setState((s) => ({
-      ...s,
-      documents: [
-        { id, type: doc.type, title: doc.title, counterparty: doc.counterparty, text: doc.text, fields: doc.fields, createdAt: new Date().toISOString() },
-        ...s.documents,
-      ],
-      tasks: [...s.tasks, ...doc.tasks.map((t) => ({ ...t, id: newId(), docId: id, registered: false }))],
-    }));
-    return id;
-  }, []);
+  const addDocument = useCallback(
+    (doc: NewDocument) => {
+      // 画面でボタンを止めるだけでなく、保存する側でも無料プランの上限を守る
+      if (!canAdd(state)) return null;
+      const id = newId();
+      setState((s) => {
+        if (!canAdd(s)) return s;
+        const stored: StoredDocument = {
+          id,
+          type: doc.type,
+          title: doc.title,
+          counterparty: doc.counterparty,
+          text: doc.text,
+          fields: doc.fields,
+          createdAt: new Date().toISOString(),
+        };
+        const newTasks = doc.tasks.map((t) => ({ ...t, id: newId(), docId: id, registered: false }));
+        return { ...s, documents: [stored, ...s.documents], tasks: [...s.tasks, ...newTasks] };
+      });
+      return id;
+    },
+    [state],
+  );
 
   const deleteDocument = useCallback((id: string) => {
     setState((s) => ({ ...s, documents: s.documents.filter((d) => d.id !== id), tasks: s.tasks.filter((t) => t.docId !== id) }));
@@ -81,7 +95,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     () => ({
       ...state,
       loaded,
-      canAddDocument: state.plan === 'paid' || state.documents.length < FREE_DOC_LIMIT,
+      canAddDocument: canAdd(state),
       addDocument,
       deleteDocument,
       updateTask,

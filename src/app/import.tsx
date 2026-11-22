@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { Button, Card, Chip, Notice, Screen, Section } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DOC_TYPE_LIST, guessDocType } from '@/lib/doc-types';
+import { DOC_TYPE_LIST, FREE_DOC_LIMIT, guessDocType } from '@/lib/doc-types';
 import { ruleBasedExtractor } from '@/lib/extractor';
 import { CONSULT_CONTACTS } from '@/lib/rules';
 import { SAMPLE_DOCS } from '@/lib/samples';
@@ -20,13 +20,23 @@ export default function ImportScreen() {
   const [text, setText] = useState('');
   const [title, setTitle] = useState('');
   const [type, setType] = useState<DocType | null>(null);
+  // 種類を利用者が選んだか（見本を選んだときも含む）。選ぶまでは本文が変わるたびに推定し直す
+  const [typeChosen, setTypeChosen] = useState(false);
   const [dispute, setDispute] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const onTextChange = (t: string) => {
     setText(t);
     setDispute(null);
-    if (!type) setType(guessDocType(t));
+    // 見本を選んだあとに別の文を貼り付けたら、見本の題名を引き継がない
+    const sample = SAMPLE_DOCS.find((x) => x.title === title);
+    if (sample && sample.text !== t) {
+      setTitle('');
+      setTypeChosen(false);
+      setType(guessDocType(t));
+      return;
+    }
+    if (!typeChosen) setType(guessDocType(t));
   };
 
   const submit = async () => {
@@ -35,6 +45,7 @@ export default function ImportScreen() {
     try {
       const result = await ruleBasedExtractor.extract(text, type);
       if (result.kind === 'dispute') {
+        // もめごとの書類は保存も要点化もしない（ルール4）
         setDispute(result.matched);
         return;
       }
@@ -46,7 +57,7 @@ export default function ImportScreen() {
         fields: result.fields,
         tasks: result.tasks,
       });
-      router.replace(`/doc/${id}`);
+      if (id) router.replace(`/doc/${id}`);
     } finally {
       setBusy(false);
     }
@@ -95,6 +106,7 @@ export default function ImportScreen() {
               onPress={() => {
                 setTitle(s.title);
                 setType(s.type);
+                setTypeChosen(true);
                 setText(s.text);
                 setDispute(null);
               }}
@@ -112,14 +124,22 @@ export default function ImportScreen() {
       </Section>
 
       <Section title="2. 種類を確かめる">
-        {type && (
+        {type && !typeChosen && (
           <ThemedText type="small" themeColor="textSecondary">
             本文から推定しました。違っていれば選び直してください。
           </ThemedText>
         )}
         <View style={styles.chips}>
           {DOC_TYPE_LIST.map((t) => (
-            <Chip key={t.type} label={t.label} selected={type === t.type} onPress={() => setType(t.type)} />
+            <Chip
+              key={t.type}
+              label={t.label}
+              selected={type === t.type}
+              onPress={() => {
+                setType(t.type);
+                setTypeChosen(true);
+              }}
+            />
           ))}
         </View>
         <ThemedText type="small" themeColor="textSecondary">
@@ -137,6 +157,9 @@ export default function ImportScreen() {
         />
       </Section>
 
+      {!canAddDocument && (
+        <Notice>無料プランで保管できるのは{FREE_DOC_LIMIT}件までです。書類を削除するか、有料プランにすると取り込めます。</Notice>
+      )}
       <Button label={busy ? '読み取り中…' : '要点を見る'} onPress={submit} disabled={!type || !text.trim() || busy || !canAddDocument} />
     </Screen>
   );
